@@ -1,0 +1,120 @@
+---
+title: "Homework 3"
+author: "Kort Alexander"
+date: "5/4/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(here)
+```
+
+```{r}
+df <- read_csv(here("HW3_data.csv")) %>% 
+  select(-1)
+```
+
+```{r}
+low_demand <- lm(data = df, Price_Cents ~ Q_Low_Kwh)
+high_demand <- lm(data = df, Price_Cents ~ Q_High_Kwh)
+
+ggplot(df, aes(x = Q_Low_Kwh, y = Price_Cents)) +
+  geom_point() +
+  geom_smooth(method = lm)
+ggplot(df, aes(x = Q_High_Kwh, y = Price_Cents)) +
+  geom_point() +
+  geom_smooth(method = lm)
+```
+
+Low demand: P = `r low_demand$coefficients[1]` + `r low_demand$coefficients[2]`(Q)
+High demand: P = `r high_demand$coefficients[1]` + `r high_demand$coefficients[2]`(Q)
+
+```{r}
+quantity_demanded <- function(p, model) {
+  q <- (p - model$coefficients[1])/model$coefficients[2]
+  q <- ifelse(q<0,0,q)
+  return(q)
+}
+
+demand_agg <- function(p){
+  q <- quantity_demanded(p, low_demand) + quantity_demanded(p, high_demand)
+  return(q)
+}
+
+price = seq(0, 30, length.out = 100)
+Qagg <- map(price, demand_agg) %>% unlist()
+
+Qagg_model <- lm(data = quantity_agg, Qagg ~ price)
+
+quantity_agg <- tibble(Qagg = Qagg, price = price)
+
+SCC_pounds <- 51 / 2205
+MEC_per_kwh_dollars <- SCC_pounds * 0.85
+MEC_per_kwh_dollars
+```
+
+```{r}
+ggplot(quantity_agg, aes(Qagg, price)) +
+  geom_line()
+```
+
+```{r}
+p_0 <- 10
+q_0 <- (28.97-10)/0.000035
+
+supply_slope <- p_0 / q_0
+```
+
+```{r}
+CS <- function(p, model){
+  q <- quantity_demanded(p, model)
+  cs <- 0.5*(model$coefficients[[1]] - p)*q
+  return(cs)
+}
+
+CS_agg <- function(p){
+  cs <- CS(p, low_demand) + CS(p, high_demand)
+  return(cs)
+}
+```
+
+```{r}
+CS_0 <- CS_agg(10)
+CS_0_dollars <- CS_0/100
+CS_0_dollars
+```
+
+```{r}
+PS <- function(p){
+  q <- (1/supply_slope)*p
+  ps <- 0.5*p*q
+  return(ps)
+}
+```
+
+```{r}
+PS_0 <- PS(10)
+PS_0_dollars <- PS_0/100
+PS_0_dollars
+```
+
+```{r}
+TEC_0_dollars <- q_0 * MEC_per_kwh_dollars
+TEC_0_dollars
+```
+
+```{r}
+CS_high_dollars <- CS(10, high_demand) / 100
+CS_high_dollars
+CS_high_percentage <- CS(10, high_demand) / CS_agg(10)
+CS_high_percentage
+CS_low_dollars <- CS(10, low_demand) / 100
+CS_low_dollars
+CS_low_percentage <- CS(10, low_demand) / CS_agg(10)
+CS_low_percentage
+```
+
+
