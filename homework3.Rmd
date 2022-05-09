@@ -69,6 +69,13 @@ supply_slope <- p_0 / q_0
 ```
 
 ```{r}
+quantity_supplied <- function(p){
+  q <- supply_slope * p
+}
+```
+
+
+```{r}
 CS <- function(p, model){
   q <- quantity_demanded(p, model)
   cs <- 0.5*(model$coefficients[[1]] - p)*q
