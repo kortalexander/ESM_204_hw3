@@ -47,9 +47,9 @@ demand_agg <- function(p){
 price = seq(0, 30, length.out = 100)
 Qagg <- map(price, demand_agg) %>% unlist()
 
-Qagg_model <- lm(data = quantity_agg, Qagg ~ price)
-
 quantity_agg <- tibble(Qagg = Qagg, price = price)
+
+Qagg_model <- lm(data = quantity_agg, Qagg ~ price)
 
 SCC_pounds <- 51 / 2205
 MEC_per_kwh_dollars <- SCC_pounds * 0.85
@@ -62,7 +62,7 @@ ggplot(quantity_agg, aes(Qagg, price)) +
 ```
 
 ```{r}
-p_0 <- 10
+p_0 <- 10.0
 q_0 <- (28.97-10)/0.000035
 
 supply_slope <- p_0 / q_0
@@ -70,7 +70,8 @@ supply_slope <- p_0 / q_0
 
 ```{r}
 quantity_supplied <- function(p){
-  q <- supply_slope * p
+  q <- p/supply_slope
+  return(q)
 }
 ```
 
@@ -122,6 +123,60 @@ CS_low_dollars <- CS(10, low_demand) / 100
 CS_low_dollars
 CS_low_percentage <- CS(10, low_demand) / CS_agg(10)
 CS_low_percentage
+```
+```{r}
+MEC_per_kwh_cents <- MEC_per_kwh_dollars * 100
+```
+
+
+
+```{r}
+quantity_supplied_w_tax <- function(p){
+  new_q <- (p - MEC_per_kwh_cents)/supply_slope
+  return(new_q)
+}
+```
+
+```{r}
+p_star <- p_0 + MEC_per_kwh_cents
+p_star
+q_star <- quantity_supplied_w_tax(p_0)
+q_star
+```
+
+```{r}
+CS_high_w_tax_cents <- CS(p_star, high_demand)
+CS_high_w_tax_dollars <- CS_high_w_tax_cents / 100
+CS_high_w_tax_dollars
+CS_high_w_tax_dollars - CS_high_dollars
+CS_low_w_tax_cents <- CS(p_star, low_demand)
+CS_low_w_tax_dollars <- CS_low_w_tax_cents / 100
+CS_low_w_tax_dollars
+CS_low_w_tax_dollars - CS_low_dollars
+```
+
+```{r}
+CS_agg_0_cents <- CS_agg(p_0)
+CS_agg_0_dollars <- CS_agg_0_cents / 100
+CS_agg_w_tax_cents <- CS_agg(p_star)
+CS_agg_w_tax_dollars <- CS_agg_w_tax_cents / 100
+CS_agg_change_dollars <- CS_agg_0_dollars - CS_agg_w_tax_dollars
+CS_agg_change_dollars
+```
+
+```{r}
+PS_change_dollars <- CS_agg_change_dollars
+PS_change_dollars
+PS_w_tax_dollars <- PS_0_dollars - PS_change_dollars
+PS_w_tax_dollars
+```
+
+```{r}
+SCC = c(51, 75, 100, 125, 150)
+cost_table <- tibble(SCC) %>% 
+  mutate(SCC_per_pound = SCC / 2205) %>% 
+  mutate(cost_per_kwh = SCC_per_pound * 0.85) %>% 
+  mutate(high_welfare = (CS(p_0 + cost_per_kwh)/100))
 ```
 
 

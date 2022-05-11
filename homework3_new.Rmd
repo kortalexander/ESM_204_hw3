@@ -1,0 +1,164 @@
+---
+title: "Homework 3"
+author: "Kort Alexander"
+date: "5/10/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(here)
+library(janitor)
+```
+
+```{r}
+df <- read_csv(here("HW3_data.csv")) %>% 
+  select(-1) %>% 
+  clean_names() %>% 
+  mutate(price_dollars = price_cents / 100)
+```
+
+```{r}
+low_demand <- lm(data = df, price_dollars ~ q_low_kwh)
+high_demand <- lm(data = df, price_dollars ~ q_high_kwh)
+```
+
+```{r}
+demand <- function(p, model){
+  q <- (p - model$coefficients[[1]])/model$coefficients[[2]]
+  q <- ifelse(q<0,0,q)
+  return(q)
+}
+
+demand_agg <- function(p){
+  q <- demand(p, low_demand) + demand(p, high_demand)
+  return(q)
+}
+```
+
+```{r}
+price <- seq(0, 0.3, 0.01)
+demand_agg_table <- tibble(price) %>% 
+  mutate(Qagg = demand_agg(price))
+
+ggplot(demand_agg_table, aes(Qagg, price)) +
+  geom_line()
+```
+
+```{r}
+MEC_per_kwh <- 0.85 * 0.000454 * 51
+
+p_0 <- 0.1
+q_0 <- demand_agg(p_0)
+supply_slope <- p_0/q_0
+```
+
+```{r}
+CS <- function(p, model){
+  q <- demand(p, model)
+  cs <- 0.5*(model$coefficients[[1]] - p)*q
+  return(cs)
+}
+
+CS_agg <- function(p){
+  cs <- CS(p, low_demand) + CS(p, high_demand)
+  return(cs)
+}
+
+quantity_supplied <- function(p){
+  q <- p / supply_slope
+  return(q)
+}
+
+PS <- function(p){
+  ps <- 0.5 * quantity_supplied(p) * p
+  return(ps)
+}
+
+TEC <- function(p){
+  tec <- quantity_supplied(p) * MEC_per_kwh
+  return(tec)
+}
+
+supply_price <- function(q){
+  p <- supply_slope * q
+  return(p)
+}
+```
+
+```{r}
+CS_0_high_percent <- CS(p_0, high_demand) / CS_agg(p_0)
+CS_0_low_percent <- CS(p_0, low_demand) / CS_agg(p_0)
+```
+
+```{r}
+t_51 <- MEC_per_kwh
+```
+
+```{r}
+demand_w_tax <- function(p, model, t){
+  q <- (p - model$coefficients[[1]] + t)/model$coefficients[[2]]
+  q <- ifelse(q<0,0,q)
+  return(q)
+}
+
+demand_agg_w_tax <- function(p, t){
+  q <- demand_w_tax(p, low_demand, t) + demand_w_tax(p, high_demand, t)
+  return(q)
+}
+```
+
+```{r}
+q_star_51 <- demand_agg_w_tax(p_0, t_51)
+p_star_51 <- supply_price(q_star_51)
+p_plus_t_51 <- p_star_51 + t_51
+
+CS_0_high <- CS(p_0, high_demand)
+CS_high_51 <- CS(p_plus_t_51, high_demand)
+CS_0_low <- CS(p_0, low_demand) - (t_51 * q_0)
+CS_low_51 <- CS(p_plus_t_51, low_demand) - (t_51 * q_star_51)
+PS_0 <- PS(p_0)
+PS_51 <- PS(p_star_51)
+TEC_0 <- TEC(p_0)
+TEC_51 <- TEC(p_star_51)
+tax_revenue_51 <- t_51 * q_star_51
+```
+
+```{r}
+SCC <- c(51, 75, 100, 125, 150, 200, 278)
+cost_table <- tibble(SCC) %>% 
+  mutate(MEC = SCC * 0.85 * 0.000454) %>% 
+  mutate(q_star = demand_agg_w_tax(p_0, MEC)) %>% 
+  mutate(p_star = supply_price(q_star)) %>% 
+  mutate(p_star_plus_t = p_star + MEC) %>% 
+  mutate(tax_revenue = q_star * MEC) %>% 
+  mutate(high_rebate = CS_0_high_percent * tax_revenue) %>% 
+  mutate(low_rebate = CS_0_low_percent * tax_revenue) %>% 
+  mutate(CS_high_wo_rebate = CS(p_star_plus_t, high_demand)) %>% 
+  mutate(CS_high_w_rebate = CS_high_wo_rebate + high_rebate) %>% 
+  mutate(CS_low_wo_rebate = CS(p_star_plus_t, low_demand) - (MEC * q_star)) %>% 
+  mutate(CS_low_w_rebate = CS_low_wo_rebate + low_rebate) %>% 
+  mutate(PS = PS(p_star)) %>% 
+  mutate(TEC = TEC(p_star))
+```
+
+```{r}
+demand_high_w_solar <- function(p, t){
+  q <- (p - (0.5 * high_demand$coefficients[[1]]) + t)/high_demand$coefficients[[2]]
+  return(q)
+}
+
+demand_agg_w_solar <- function(p, t){
+  q <- demand_w_tax(p, low_demand, t) + demand_high_w_solar(p, t)
+  return(q)
+}
+```
+
+```{r}
+q_star_solar <- demand_agg_w_solar(p_0, 0)
+p_star_solar <- supply_price(q_star_solar)
+TEC_solar <- TEC(p_star_solar)
+```
+
